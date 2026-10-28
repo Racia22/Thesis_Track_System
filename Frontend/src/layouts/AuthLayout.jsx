@@ -54,7 +54,7 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
           </ul>
         </div>
 
-        <p className="relative text-xs text-brand-100/60">Adventist University of Central Africa</p>
+        <p className="relative text-xs text-brand-100/60"></p>
       </aside>
 
       <main className="flex flex-1 items-center justify-center px-5 py-12 sm:px-8">
