@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { computeTicks, roundedRightRectPath } from './chartUtils'
+import { CHART_COLORS, computeTicks, roundedRightRectPath } from './chartUtils'
 
-const WIDTH = 640
 const ROW_HEIGHT = 36
 const MARGIN = { top: 8, right: 40, bottom: 28, left: 140 }
-const BAR_COLOR = '#FF6B35'
-const BAR_COLOR_HOVER = '#e35a28'
+const BAR_COLOR = CHART_COLORS.primary
+const BAR_COLOR_HOVER = CHART_COLORS.primaryHover
 
-export default function HorizontalBarChart({ data, valueSuffix = '', formatValue }) {
+export default function HorizontalBarChart({ data, valueSuffix = '', formatValue, width: WIDTH = 640 }) {
   const [hoverIndex, setHoverIndex] = useState(null)
 
   const plotWidth = WIDTH - MARGIN.left - MARGIN.right
@@ -20,7 +19,7 @@ export default function HorizontalBarChart({ data, valueSuffix = '', formatValue
   const format = formatValue ?? ((v) => `${v}${valueSuffix}`)
 
   if (data.length === 0) {
-    return <p className="text-sm text-gray-500">No data yet.</p>
+    return <p className="text-sm text-slate-500">No data yet.</p>
   }
 
   return (
@@ -31,8 +30,8 @@ export default function HorizontalBarChart({ data, valueSuffix = '', formatValue
             const x = niceMax > 0 ? (tick / niceMax) * plotWidth : 0
             return (
               <g key={tick}>
-                <line x1={x} x2={x} y1={0} y2={plotHeight} stroke="#e5e7eb" strokeWidth={1} />
-                <text x={x} y={plotHeight + 16} textAnchor="middle" className="fill-gray-400" fontSize={11}>
+                <line x1={x} x2={x} y1={0} y2={plotHeight} stroke="#e2e8f0" strokeWidth={1} strokeDasharray={tick === 0 ? undefined : '3 3'} />
+                <text x={x} y={plotHeight + 16} textAnchor="middle" fill="#94a3b8" fontSize={11}>
                   {tick}
                 </text>
               </g>
@@ -46,13 +45,13 @@ export default function HorizontalBarChart({ data, valueSuffix = '', formatValue
 
             return (
               <g key={d.label}>
-                <text x={-12} y={i * ROW_HEIGHT + ROW_HEIGHT / 2} textAnchor="end" dominantBaseline="middle" className="fill-[#1A1A2E]" fontSize={12}>
+                <text x={-12} y={i * ROW_HEIGHT + ROW_HEIGHT / 2} textAnchor="end" dominantBaseline="middle" fill="#334155" fontSize={12}>
                   {d.label}
                 </text>
                 {d.value > 0 && (
                   <path d={roundedRightRectPath(0, y, barWidth, barHeight, 4)} fill={isHovered ? BAR_COLOR_HOVER : BAR_COLOR} />
                 )}
-                <text x={barWidth + 8} y={i * ROW_HEIGHT + ROW_HEIGHT / 2} dominantBaseline="middle" className="fill-[#1A1A2E]" fontSize={12} fontWeight={600}>
+                <text x={barWidth + 8} y={i * ROW_HEIGHT + ROW_HEIGHT / 2} dominantBaseline="middle" fill="#0f172a" fontSize={12} fontWeight={600}>
                   {format(d.value)}
                 </text>
                 <rect
@@ -72,7 +71,7 @@ export default function HorizontalBarChart({ data, valueSuffix = '', formatValue
 
       {hoverIndex !== null && (
         <div
-          className="pointer-events-none absolute -translate-y-1/2 rounded-md bg-[#1A1A2E] px-2.5 py-1.5 text-xs text-white shadow-lg"
+          className="pointer-events-none absolute -translate-y-1/2 rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg"
           style={{
             left: `${(MARGIN.left / WIDTH) * 100}%`,
             top: `${((MARGIN.top + hoverIndex * ROW_HEIGHT + ROW_HEIGHT / 2) / height) * 100}%`,

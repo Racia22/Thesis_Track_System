@@ -1,3 +1,10 @@
+export const CHART_COLORS = {
+  primary: '#2557d6',
+  primaryHover: '#1d45b0',
+  secondary: '#93b4fd',
+  secondaryHover: '#608bfa',
+}
+
 export function niceNumber(value) {
   if (value <= 0) return 1
   const exponent = Math.floor(Math.log10(value))
