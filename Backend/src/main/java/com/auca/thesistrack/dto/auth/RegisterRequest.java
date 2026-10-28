@@ -25,4 +25,7 @@ public record RegisterRequest(
 
         String department
 ) {
+    public RegisterRequest {
+        email = EmailNormalizer.normalize(email);
+    }
 }

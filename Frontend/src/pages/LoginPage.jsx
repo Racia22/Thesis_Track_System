@@ -47,6 +47,9 @@ export default function LoginPage() {
             id="email"
             type="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             autoFocus
             value={email}

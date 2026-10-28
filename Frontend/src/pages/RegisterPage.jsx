@@ -101,6 +101,9 @@ export default function RegisterPage() {
             type="email"
             required
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder="you@auca.ac.rw"
             value={form.email}
             onChange={updateField('email')}
