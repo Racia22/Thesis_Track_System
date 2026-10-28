@@ -6,10 +6,10 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 /**
- * The schema has no stage-transition history table, so "time in stage" is derived from
- * whichever timestamp column corresponds to the thesis's current status, falling back to
- * updated_at. This means it reflects time in the CURRENT stage only, not a full historical
- * per-stage duration log.
+ * Time-in-current-stage helpers. {@code stage_entered_at} is maintained on every status
+ * change (and back-filled for older rows by StageHistoryBackfill); the timestamp-column
+ * fallback only covers a row that somehow has none, e.g. one inserted by hand.
+ * Per-stage durations across a thesis's whole history live in thesis_stage_history.
  */
 public final class ThesisStageUtil {
 
@@ -17,6 +17,9 @@ public final class ThesisStageUtil {
     }
 
     public static LocalDateTime resolveStageEnteredAt(Thesis thesis) {
+        if (thesis.getStageEnteredAt() != null) {
+            return thesis.getStageEnteredAt();
+        }
         return switch (thesis.getStatus()) {
             case REGISTERED -> thesis.getRegisteredAt();
             case PROTOTYPE_REVIEWED -> thesis.getPrototypeReviewedAt() != null
@@ -28,10 +31,13 @@ public final class ThesisStageUtil {
     }
 
     public static long daysInCurrentStage(Thesis thesis) {
-        LocalDateTime stageEnteredAt = resolveStageEnteredAt(thesis);
-        if (stageEnteredAt == null) {
+        return daysBetween(resolveStageEnteredAt(thesis), LocalDateTime.now());
+    }
+
+    public static long daysBetween(LocalDateTime from, LocalDateTime to) {
+        if (from == null || to == null) {
             return 0;
         }
-        return Math.max(ChronoUnit.DAYS.between(stageEnteredAt, LocalDateTime.now()), 0);
+        return Math.max(ChronoUnit.DAYS.between(from, to), 0);
     }
 }

@@ -4,12 +4,14 @@ import com.auca.thesistrack.dto.supervisor.SupervisorSummaryResponse;
 import com.auca.thesistrack.dto.thesis.CreateThesisRequest;
 import com.auca.thesistrack.dto.thesis.ThesisResponse;
 import com.auca.thesistrack.entity.Thesis;
+import com.auca.thesistrack.entity.ThesisStageHistory;
 import com.auca.thesistrack.entity.User;
 import com.auca.thesistrack.entity.enums.NotificationType;
 import com.auca.thesistrack.entity.enums.Role;
 import com.auca.thesistrack.entity.enums.ThesisStatus;
 import com.auca.thesistrack.exception.ApiException;
 import com.auca.thesistrack.repository.ThesisRepository;
+import com.auca.thesistrack.repository.ThesisStageHistoryRepository;
 import com.auca.thesistrack.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,12 +26,15 @@ public class ThesisService {
     private final ThesisRepository thesisRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ThesisStageHistoryRepository stageHistoryRepository;
 
     public ThesisService(ThesisRepository thesisRepository, UserRepository userRepository,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          ThesisStageHistoryRepository stageHistoryRepository) {
         this.thesisRepository = thesisRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.stageHistoryRepository = stageHistoryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -48,13 +53,16 @@ public class ThesisService {
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> ApiException.notFound("Student not found"));
 
+        LocalDateTime now = LocalDateTime.now();
         Thesis thesis = Thesis.builder()
                 .student(student)
                 .title(request.title())
                 .description(request.description())
+                .stageEnteredAt(now)
                 .build();
 
         thesis = thesisRepository.saveAndFlush(thesis);
+        recordStageEntry(thesis, now);
         return ThesisResponse.from(thesis);
     }
 
@@ -66,9 +74,28 @@ public class ThesisService {
     @Transactional
     public void advanceStatusIfForward(Thesis thesis, ThesisStatus target) {
         if (target.ordinal() > thesis.getStatus().ordinal()) {
+            LocalDateTime now = LocalDateTime.now();
+            stageHistoryRepository.findByThesisIdAndExitedAtIsNull(thesis.getId())
+                    .ifPresent(open -> {
+                        open.setExitedAt(now);
+                        // Flush the close before inserting the new open row, or the
+                        // one-open-stage-per-thesis unique index rejects the insert.
+                        stageHistoryRepository.saveAndFlush(open);
+                    });
+
             thesis.setStatus(target);
+            thesis.setStageEnteredAt(now);
             thesisRepository.save(thesis);
+            recordStageEntry(thesis, now);
         }
+    }
+
+    private void recordStageEntry(Thesis thesis, LocalDateTime enteredAt) {
+        stageHistoryRepository.save(ThesisStageHistory.builder()
+                .thesis(thesis)
+                .status(thesis.getStatus())
+                .enteredAt(enteredAt)
+                .build());
     }
 
     @Transactional
