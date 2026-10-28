@@ -1,16 +1,46 @@
-# React + Vite
+# ThesisTrack — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React single-page app for ThesisTrack. See the [root README](../README.md) for the full project.
 
-Currently, two official plugins are available:
+**Stack:** React 19, Vite, Tailwind CSS 4, React Router 7, axios, lucide-react icons.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Scripts
 
-## React Compiler
+```bash
+npm install
+npm run dev       # http://localhost:5173 (expects the backend on http://localhost:8080)
+npm run lint      # oxlint
+npm run build     # production build into dist/
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Set `VITE_API_BASE_URL` to point at a different backend (default `http://localhost:8080/api`).
 
-## Expanding the Oxlint configuration
+## Structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```
+src/
+  api/client.js          axios instance; attaches the JWT and refreshes it on 401
+  context/AuthContext    login, register, logout and the signed-in user
+  layouts/               AppLayout (sidebar + top bar), AuthLayout (sign-in screens)
+  components/ui.jsx      shared UI primitives: Button, Card, Field, Badge, Table, …
+  components/            ProgressTracker, MessageThread, DocumentsPanel, charts/
+  hooks/                 useMyThesis, useSupervisedThesis
+  lib/                   formatting helpers, stage metadata, class-name helper
+  pages/                 student/, supervisor/, coordinator/, admin/, plus shared pages
+```
+
+## Roles and pages
+
+| Role | Pages |
+|---|---|
+| Student | Dashboard, prototype review booking, documents, messages |
+| Supervisor | My students, per-student messages and documents |
+| Coordinator | Review slots, supervisor assignment queue |
+| Admin | Everything a coordinator sees, plus analytics |
+
+Every role has a notifications page at `/notifications`.
+
+## Styling
+
+Design tokens (the `brand` colour scale and the Inter font) live in `src/index.css`.
+Build new screens from the primitives in `components/ui.jsx` rather than hardcoding colours.
