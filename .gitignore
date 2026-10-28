@@ -1,0 +1,21 @@
+# Dependencies & build output
+node_modules/
+Frontend/dist/
+Backend/target/
+
+# Local config & secrets
+.env
+.env.*
+!.env.example
+.claude/
+
+# Runtime data
+Backend/uploads/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
