@@ -1,39 +1,32 @@
-import { useEffect, useState } from 'react'
-import apiClient from '../../api/client'
+import { FileX2 } from 'lucide-react'
 import DocumentsPanel from '../../components/DocumentsPanel'
+import useMyThesis from '../../hooks/useMyThesis'
+import { Alert, Button, Card, EmptyState, LoadingState, PageHeader } from '../../components/ui'
 
 export default function StudentDocuments() {
-  const [thesis, setThesis] = useState(null)
-  const [status, setStatus] = useState('loading')
+  const { thesis, status } = useMyThesis()
 
-  useEffect(() => {
-    apiClient
-      .get('/theses/my')
-      .then(({ data }) => {
-        setThesis(data)
-        setStatus('found')
-      })
-      .catch((err) => {
-        setStatus(err.response?.status === 404 ? 'none' : 'error')
-      })
-  }, [])
-
-  if (status === 'loading') {
-    return <p className="text-sm text-gray-500">Loading…</p>
-  }
-
-  if (status === 'error') {
-    return <p className="text-sm text-red-600">Something went wrong. Please refresh.</p>
-  }
-
-  if (status === 'none') {
-    return <p className="text-sm text-gray-500">Register a thesis first to upload documents.</p>
-  }
+  if (status === 'loading') return <LoadingState />
+  if (status === 'error') return <Alert>Something went wrong. Please refresh the page.</Alert>
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-[#1A1A2E]">Documents</h1>
-      <DocumentsPanel thesisId={thesis.id} allowUpload />
-    </div>
+    <>
+      <PageHeader
+        title="Documents"
+        description="Upload drafts and supporting files. Uploading a file with the same name creates a new version."
+      />
+      {status === 'none' ? (
+        <Card>
+          <EmptyState
+            icon={FileX2}
+            title="Register your thesis first"
+            description="You can upload documents once your thesis is registered."
+            action={<Button to="/student/dashboard">Go to dashboard</Button>}
+          />
+        </Card>
+      ) : (
+        <DocumentsPanel thesisId={thesis.id} allowUpload />
+      )}
+    </>
   )
 }

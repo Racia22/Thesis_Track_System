@@ -1,25 +1,22 @@
-import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import apiClient from '../../api/client'
 import DocumentsPanel from '../../components/DocumentsPanel'
+import useSupervisedThesis from '../../hooks/useSupervisedThesis'
+import { PageHeader, StageBadge } from '../../components/ui'
+import { BackToStudents } from './SupervisorMessages'
 
 export default function SupervisorDocuments() {
   const { thesisId } = useParams()
-  const [thesis, setThesis] = useState(null)
-
-  useEffect(() => {
-    apiClient.get('/theses/supervised').then(({ data }) => {
-      setThesis(data.find((t) => t.id === thesisId) ?? null)
-    })
-  }, [thesisId])
+  const thesis = useSupervisedThesis(thesisId)
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold text-[#1A1A2E]">{thesis?.studentName ?? 'Documents'}</h1>
-        {thesis?.title && <p className="text-sm text-gray-500">{thesis.title}</p>}
-      </div>
+    <>
+      <PageHeader
+        eyebrow={<BackToStudents />}
+        title={thesis ? `${thesis.studentName} — documents` : 'Documents'}
+        description={thesis?.title}
+        actions={thesis && <StageBadge status={thesis.status} />}
+      />
       <DocumentsPanel thesisId={thesisId} allowUpload={false} />
-    </div>
+    </>
   )
 }
