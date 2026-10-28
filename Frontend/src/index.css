@@ -1,16 +1,47 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy: #1A1A2E;
-  --color-navy-light: #24243c;
-  --color-orange: #FF6B35;
-  --color-orange-dark: #e35a28;
-  --color-cream: #FFF8F0;
-  --font-sans: "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6fe;
+  --color-brand-200: #bfd3fe;
+  --color-brand-300: #93b4fd;
+  --color-brand-400: #608bfa;
+  --color-brand-500: #3b6ef5;
+  --color-brand-600: #2557d6;
+  --color-brand-700: #1d45b0;
+  --color-brand-800: #1c3a8c;
+  --color-brand-900: #172f6b;
+  --color-brand-950: #0f1d45;
 }
 
-body {
-  background-color: var(--color-cream);
-  font-family: var(--font-sans);
-  color: #1A1A2E;
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}
+
+@layer components {
+  /* Shared form-control look so inputs, selects and textareas stay identical everywhere. */
+  .form-control {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs
+      placeholder:text-slate-400
+      focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .form-control[aria-invalid="true"] {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-500/15;
+  }
 }
