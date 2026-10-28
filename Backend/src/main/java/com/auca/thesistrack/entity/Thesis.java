@@ -58,6 +58,10 @@ public class Thesis {
     @Column(name = "defense_date")
     private LocalDateTime defenseDate;
 
+    /** When the thesis entered its current {@link #status}; set on every status change. */
+    @Column(name = "stage_entered_at")
+    private LocalDateTime stageEnteredAt;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
