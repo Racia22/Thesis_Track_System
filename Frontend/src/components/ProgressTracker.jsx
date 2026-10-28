@@ -1,84 +1,84 @@
-const STAGES = [
-  { key: 'REGISTERED', label: 'Registered' },
-  { key: 'PROTOTYPE_PENDING', label: 'Prototype Review Booked' },
-  { key: 'PROTOTYPE_REVIEWED', label: 'Prototype Reviewed' },
-  { key: 'SUPERVISOR_ASSIGNED', label: 'Supervisor Assigned' },
-  { key: 'IN_PROGRESS', label: 'In Progress' },
-  { key: 'READY_FOR_DEFENSE', label: 'Ready for Defense' },
-  { key: 'COMPLETED', label: 'Completed' },
-]
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-      <path
-        fillRule="evenodd"
-        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
+import { Check } from 'lucide-react'
+import { STAGES, daysLabel } from '../lib/format'
+import { Card, CardHeader } from './ui'
+import { cx } from '../lib/cx'
 
 export default function ProgressTracker({ status, daysInCurrentStage }) {
   const currentIndex = STAGES.findIndex((s) => s.key === status)
+  const isFinished = status === 'COMPLETED'
+  const percent = Math.round((currentIndex / (STAGES.length - 1)) * 100)
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <h2 className="mb-6 text-lg font-semibold text-[#1A1A2E]">Thesis Progress</h2>
+    <Card>
+      <CardHeader
+        title="Thesis progress"
+        description={`Stage ${currentIndex + 1} of ${STAGES.length}`}
+        actions={
+          <div className="flex items-center gap-3">
+            <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-slate-100 sm:block">
+              <div className="h-full rounded-full bg-brand-600" style={{ width: `${percent}%` }} />
+            </div>
+            <span className="text-sm font-semibold text-slate-900">{percent}%</span>
+          </div>
+        }
+      />
 
-      <ol className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-0">
+      <ol className="grid gap-0 px-5 py-6 lg:grid-cols-7">
         {STAGES.map((stage, index) => {
-          const isCompleted = index < currentIndex
-          const isCurrent = index === currentIndex
-          const isUpcoming = index > currentIndex
+          const isCompleted = index < currentIndex || (isFinished && index === currentIndex)
+          const isCurrent = index === currentIndex && !isFinished
+          const isLast = index === STAGES.length - 1
 
           return (
-            <li key={stage.key} className="flex flex-1 sm:flex-col sm:items-center">
-              <div className="flex items-center sm:w-full">
-                <div
-                  className={[
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold',
-                    isCompleted && 'border-[#FF6B35] bg-[#FF6B35] text-white',
-                    isCurrent && 'border-[#1A1A2E] bg-[#1A1A2E] text-white ring-4 ring-[#FF6B35]/25',
-                    isUpcoming && 'border-gray-300 bg-white text-gray-400',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  {isCompleted ? <CheckIcon /> : index + 1}
-                </div>
-
-                {index < STAGES.length - 1 && (
-                  <div
-                    className={[
-                      'ml-2 h-0.5 flex-1 sm:ml-0 sm:mt-4 sm:h-0.5 sm:w-full',
-                      'hidden sm:block',
-                      isCompleted ? 'bg-[#FF6B35]' : 'bg-gray-200',
-                    ].join(' ')}
+            <li key={stage.key} className="relative flex gap-4 pb-6 last:pb-0 lg:flex-col lg:items-center lg:gap-3 lg:pb-0 lg:text-center">
+              {/* Connector: vertical on small screens, horizontal on large */}
+              {!isLast && (
+                <>
+                  <span
+                    className={cx(
+                      'absolute top-8 bottom-0 left-4 w-px -translate-x-1/2 lg:hidden',
+                      isCompleted ? 'bg-brand-600' : 'bg-slate-200',
+                    )}
+                    aria-hidden="true"
                   />
-                )}
-              </div>
+                  <span
+                    className={cx(
+                      'absolute top-4 left-[calc(50%+1.25rem)] hidden h-px w-[calc(100%-2.5rem)] lg:block',
+                      isCompleted ? 'bg-brand-600' : 'bg-slate-200',
+                    )}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
 
-              <div className="ml-3 sm:ml-0 sm:mt-2 sm:text-center">
+              <span
+                className={cx(
+                  'relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                  isCompleted && 'bg-brand-600 text-white',
+                  isCurrent && 'bg-white text-brand-700 ring-2 ring-brand-600 ring-offset-2',
+                  !isCompleted && !isCurrent && 'bg-white text-slate-400 ring-1 ring-slate-300',
+                )}
+              >
+                {isCompleted ? <Check className="h-4 w-4" strokeWidth={3} /> : index + 1}
+              </span>
+
+              <div className="min-w-0 pt-1 lg:px-1 lg:pt-0">
                 <p
-                  className={[
-                    'text-sm font-medium',
-                    isCurrent ? 'text-[#1A1A2E]' : isCompleted ? 'text-[#1A1A2E]' : 'text-gray-400',
-                  ].join(' ')}
+                  className={cx(
+                    'text-sm font-medium lg:text-xs',
+                    isCurrent ? 'text-brand-700' : isCompleted ? 'text-slate-900' : 'text-slate-400',
+                  )}
                 >
                   {stage.label}
                 </p>
                 {isCurrent && (
-                  <p className="mt-0.5 text-xs font-medium text-[#FF6B35]">
-                    {daysInCurrentStage} {daysInCurrentStage === 1 ? 'day' : 'days'} in this stage
-                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{daysLabel(daysInCurrentStage)} in this stage</p>
                 )}
               </div>
             </li>
           )
         })}
       </ol>
-    </div>
+    </Card>
   )
 }
