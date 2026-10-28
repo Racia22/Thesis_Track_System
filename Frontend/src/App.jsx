@@ -17,21 +17,40 @@ import AnalyticsDashboard from './pages/admin/AnalyticsDashboard'
 import NotificationsPage from './pages/NotificationsPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 
+const HOME_BY_ROLE = {
+  STUDENT: '/student/dashboard',
+  SUPERVISOR: '/supervisor/students',
+  COORDINATOR: '/coordinator/slots',
+  ADMIN: '/coordinator/slots',
+}
+
 function HomeRedirect() {
   const { user } = useAuth()
-  if (user?.role === 'STUDENT') return <Navigate to="/student/dashboard" replace />
-  if (user?.role === 'COORDINATOR' || user?.role === 'ADMIN') return <Navigate to="/coordinator/slots" replace />
-  if (user?.role === 'SUPERVISOR') return <Navigate to="/supervisor/students" replace />
-  return <PlaceholderPage title={`${user?.role ?? ''} dashboard`} />
+  const home = HOME_BY_ROLE[user?.role]
+  if (home) return <Navigate to={home} replace />
+  return <PlaceholderPage title="Dashboard" />
 }
+
+function GuestOnly({ children }) {
+  const { isAuthenticated } = useAuth()
+  return isAuthenticated ? <Navigate to="/" replace /> : children
+}
+
+function RoleRoute({ roles, children }) {
+  return <ProtectedRoute allowedRoles={roles}>{children}</ProtectedRoute>
+}
+
+const STUDENT = ['STUDENT']
+const SUPERVISOR = ['SUPERVISOR']
+const COORDINATION = ['COORDINATOR', 'ADMIN']
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
+          <Route path="/register" element={<GuestOnly><RegisterPage /></GuestOnly>} />
 
           <Route
             element={
@@ -41,25 +60,25 @@ export default function App() {
             }
           >
             <Route path="/" element={<HomeRedirect />} />
-            <Route path="/student/dashboard" element={<StudentDashboard />} />
-            <Route path="/student/book-slot" element={<BookSlot />} />
-            <Route path="/student/messages" element={<StudentMessages />} />
-            <Route path="/student/documents" element={<StudentDocuments />} />
-            <Route path="/student/notifications" element={<NotificationsPage />} />
-            <Route path="/coordinator/slots" element={<SlotsManagement />} />
-            <Route path="/coordinator/supervisor-queue" element={<SupervisorQueue />} />
-            <Route path="/supervisor/students" element={<StudentsList />} />
-            <Route path="/supervisor/messages/:thesisId" element={<SupervisorMessages />} />
-            <Route path="/supervisor/documents/:thesisId" element={<SupervisorDocuments />} />
-            <Route path="/supervisor/notifications" element={<NotificationsPage />} />
-            <Route
-              path="/admin/analytics"
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <AnalyticsDashboard />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/notifications" element={<NotificationsPage />} />
+
+            <Route path="/student/dashboard" element={<RoleRoute roles={STUDENT}><StudentDashboard /></RoleRoute>} />
+            <Route path="/student/book-slot" element={<RoleRoute roles={STUDENT}><BookSlot /></RoleRoute>} />
+            <Route path="/student/messages" element={<RoleRoute roles={STUDENT}><StudentMessages /></RoleRoute>} />
+            <Route path="/student/documents" element={<RoleRoute roles={STUDENT}><StudentDocuments /></RoleRoute>} />
+
+            <Route path="/supervisor/students" element={<RoleRoute roles={SUPERVISOR}><StudentsList /></RoleRoute>} />
+            <Route path="/supervisor/messages/:thesisId" element={<RoleRoute roles={SUPERVISOR}><SupervisorMessages /></RoleRoute>} />
+            <Route path="/supervisor/documents/:thesisId" element={<RoleRoute roles={SUPERVISOR}><SupervisorDocuments /></RoleRoute>} />
+
+            <Route path="/coordinator/slots" element={<RoleRoute roles={COORDINATION}><SlotsManagement /></RoleRoute>} />
+            <Route path="/coordinator/supervisor-queue" element={<RoleRoute roles={COORDINATION}><SupervisorQueue /></RoleRoute>} />
+
+            <Route path="/admin/analytics" element={<RoleRoute roles={['ADMIN']}><AnalyticsDashboard /></RoleRoute>} />
+
+            {/* Old per-role notification URLs, kept so existing links still work. */}
+            <Route path="/student/notifications" element={<Navigate to="/notifications" replace />} />
+            <Route path="/supervisor/notifications" element={<Navigate to="/notifications" replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
