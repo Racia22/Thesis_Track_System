@@ -1,35 +1,57 @@
 import { useEffect, useState } from 'react'
+import { CalendarCheck2, CalendarX2, Clock, MapPin, Users } from 'lucide-react'
 import apiClient from '../../api/client'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+} from '../../components/ui'
+import { cx } from '../../lib/cx'
+import { apiError, dateParts, formatDate, formatTime } from '../../lib/format'
 
-function formatDate(dateStr) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function formatTime(timeStr) {
-  return timeStr.slice(0, 5)
+function DateBlock({ date, highlighted }) {
+  const { month, day, weekday } = dateParts(date)
+  return (
+    <div
+      className={cx(
+        'flex w-14 shrink-0 flex-col items-center rounded-lg border py-1.5',
+        highlighted ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-700',
+      )}
+    >
+      <span className="text-[11px] font-semibold tracking-wide uppercase">{month}</span>
+      <span className="text-xl leading-6 font-semibold">{day}</span>
+      <span className="text-[11px] text-slate-500">{weekday}</span>
+    </div>
+  )
 }
 
 export default function BookSlot() {
   const [slots, setSlots] = useState([])
   const [myBookings, setMyBookings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [busySlotId, setBusySlotId] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
   async function loadData() {
-    setLoading(true)
-    const [slotsRes, bookingsRes] = await Promise.all([
-      apiClient.get('/slots'),
-      apiClient.get('/bookings/my').catch((err) => (err.response?.status === 404 ? { data: [] } : Promise.reject(err))),
-    ])
-    setSlots(slotsRes.data)
-    setMyBookings(bookingsRes.data)
-    setLoading(false)
+    try {
+      const [slotsRes, bookingsRes] = await Promise.all([
+        apiClient.get('/slots'),
+        apiClient.get('/bookings/my').catch((err) => (err.response?.status === 404 ? { data: [] } : Promise.reject(err))),
+      ])
+      setSlots(slotsRes.data)
+      setMyBookings(bookingsRes.data)
+      setLoadError('')
+    } catch (err) {
+      setLoadError(apiError(err, 'Could not load review slots'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -38,89 +60,129 @@ export default function BookSlot() {
 
   const activeBooking = myBookings.find((b) => b.status === 'BOOKED')
 
-  async function handleBook(slotId) {
+  async function runAction(id, request, fallback) {
     setActionError('')
-    setBusySlotId(slotId)
+    setBusyId(id)
     try {
-      await apiClient.post('/bookings', { slotId })
+      await request()
       await loadData()
     } catch (err) {
-      setActionError(err.response?.data?.message || 'Could not book this slot')
+      setActionError(apiError(err, fallback))
     } finally {
-      setBusySlotId(null)
+      setBusyId(null)
     }
   }
 
-  async function handleCancel(bookingId) {
-    setActionError('')
-    setBusySlotId(bookingId)
-    try {
-      await apiClient.put(`/bookings/${bookingId}/cancel`)
-      await loadData()
-    } catch (err) {
-      setActionError(err.response?.data?.message || 'Could not cancel this booking')
-    } finally {
-      setBusySlotId(null)
-    }
-  }
+  const handleBook = (slotId) =>
+    runAction(slotId, () => apiClient.post('/bookings', { slotId }), 'Could not book this slot')
 
-  if (loading) {
-    return <p className="text-sm text-gray-500">Loading available slots…</p>
-  }
+  const handleCancel = (bookingId) =>
+    runAction(bookingId, () => apiClient.put(`/bookings/${bookingId}/cancel`), 'Could not cancel this booking')
+
+  if (loading) return <LoadingState label="Loading review slots…" />
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-[#1A1A2E]">Book a Prototype Review Slot</h1>
+    <>
+      <PageHeader
+        title="Prototype review"
+        description="Reserve a slot to present your prototype to the review panel. You can hold one booking at a time."
+      />
 
-      {actionError && (
-        <p className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-600">{actionError}</p>
-      )}
+      <div className="space-y-6">
+        {loadError && <Alert>{loadError}</Alert>}
+        {actionError && <Alert>{actionError}</Alert>}
 
-      {activeBooking && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-sm font-semibold text-[#1A1A2E]">Your upcoming booking</h2>
-          <p className="text-sm text-gray-700">
-            {formatDate(activeBooking.slot.slotDate)} at {formatTime(activeBooking.slot.startTime)}
-            {activeBooking.slot.location && ` — ${activeBooking.slot.location}`}
-          </p>
-          <button
-            onClick={() => handleCancel(activeBooking.id)}
-            disabled={busySlotId === activeBooking.id}
-            className="mt-3 rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
-          >
-            {busySlotId === activeBooking.id ? 'Cancelling…' : 'Cancel booking'}
-          </button>
-        </div>
-      )}
-
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-[#1A1A2E]">Available slots</h2>
-
-        {slots.length === 0 && <p className="text-sm text-gray-500">No available slots right now. Check back later.</p>}
-
-        <ul className="flex flex-col divide-y divide-gray-100">
-          {slots.map((slot) => (
-            <li key={slot.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#1A1A2E]">
-                  {formatDate(slot.slotDate)} · {formatTime(slot.startTime)}–{formatTime(slot.endTime)}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {slot.location ? `${slot.location} · ` : ''}
-                  {slot.spotsAvailable} of {slot.capacity} spots left
+        {activeBooking && (
+          <Card className="overflow-hidden border-brand-200">
+            <div className="flex flex-col gap-4 bg-gradient-to-r from-brand-50 to-white p-5 sm:flex-row sm:items-center">
+              <DateBlock date={activeBooking.slot.slotDate} highlighted />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Your upcoming review</p>
+                  <Badge tone="brand" dot>
+                    Booked
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">
+                  {formatDate(activeBooking.slot.slotDate)} · {formatTime(activeBooking.slot.startTime)}–
+                  {formatTime(activeBooking.slot.endTime)}
+                  {activeBooking.slot.location && ` · ${activeBooking.slot.location}`}
                 </p>
               </div>
-              <button
-                onClick={() => handleBook(slot.id)}
-                disabled={Boolean(activeBooking) || busySlotId === slot.id}
-                className="self-start rounded-md bg-[#FF6B35] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#e35a28] disabled:opacity-50 sm:self-auto"
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => handleCancel(activeBooking.id)}
+                loading={busyId === activeBooking.id}
               >
-                {busySlotId === slot.id ? 'Booking…' : 'Book this slot'}
-              </button>
-            </li>
-          ))}
-        </ul>
+                Cancel booking
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader
+            title="Available slots"
+            description={slots.length > 0 ? `${slots.length} upcoming ${slots.length === 1 ? 'slot' : 'slots'}` : undefined}
+          />
+          {slots.length === 0 ? (
+            <EmptyState
+              icon={CalendarX2}
+              title="No open slots right now"
+              description="The coordinator hasn't published any upcoming review slots yet. Check back soon."
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {slots.map((slot) => {
+                const full = slot.spotsAvailable === 0
+                const isMine = activeBooking?.slot.id === slot.id
+                return (
+                  <li key={slot.id} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center">
+                    <DateBlock date={slot.slotDate} highlighted={isMine} />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {slot.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {slot.location}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {slot.spotsAvailable} of {slot.capacity} {slot.capacity === 1 ? 'spot' : 'spots'} left
+                        </span>
+                      </div>
+                      {slot.notes && <p className="text-xs text-slate-500">{slot.notes}</p>}
+                    </div>
+                    {isMine ? (
+                      <Badge tone="brand" className="self-start sm:self-auto">
+                        <CalendarCheck2 className="h-3.5 w-3.5" /> Your booking
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant={full ? 'secondary' : 'primary'}
+                        onClick={() => handleBook(slot.id)}
+                        disabled={Boolean(activeBooking) || full}
+                        loading={busyId === slot.id}
+                        className="self-start sm:self-auto"
+                        title={activeBooking ? 'Cancel your current booking to choose another slot' : undefined}
+                      >
+                        {full ? 'Full' : 'Book slot'}
+                      </Button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
       </div>
-    </div>
+    </>
   )
 }
