@@ -1,0 +1,11 @@
+# Local development defaults. Activated automatically by `mvn spring-boot:run` (see the
+# spring-boot-maven-plugin config in pom.xml); from an IDE set SPRING_PROFILES_ACTIVE=dev.
+# Never enable this profile in production — these values are public in the repo.
+spring:
+  datasource:
+    username: ${DB_USERNAME:thesistrack_app}
+    password: ${DB_PASSWORD:thesistrack_app_pw}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-jwt-secret-not-for-production-use-0123456789abcdef}
