@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BookOpenCheck, GraduationCap } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import AuthLayout from '../layouts/AuthLayout'
+import { Alert, Button, Field, Input } from '../components/ui'
+import { cx } from '../lib/cx'
+import { apiError } from '../lib/format'
+
+const ROLE_OPTIONS = [
+  { value: 'STUDENT', label: 'Student', description: 'Writing a thesis', icon: GraduationCap },
+  { value: 'SUPERVISOR', label: 'Supervisor', description: 'Guiding students', icon: BookOpenCheck },
+]
 
 export default function RegisterPage() {
   const { register, loading } = useAuth()
@@ -25,105 +35,104 @@ export default function RegisterPage() {
     setError('')
     setFieldErrors({})
     try {
-      const data = await register(form)
-      const redirectTo = data.user.role === 'STUDENT' ? '/student/dashboard' : '/'
-      navigate(redirectTo, { replace: true })
+      await register(form)
+      navigate('/', { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed')
+      setError(apiError(err, 'Registration failed'))
       setFieldErrors(err.response?.data?.fieldErrors || {})
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-[#1A1A2E]">Create your account</h1>
-        <p className="mb-6 text-sm text-gray-500">ThesisTrack — AUCA</p>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Full name</label>
-            <input
-              required
-              value={form.name}
-              onChange={updateField('name')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-            {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Email</label>
-            <input
-              type="email"
-              required
-              value={form.email}
-              onChange={updateField('email')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-            {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Password</label>
-            <input
-              type="password"
-              required
-              value={form.password}
-              onChange={updateField('password')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-            {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">I am a</label>
-            <select
-              value={form.role}
-              onChange={updateField('role')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            >
-              <option value="STUDENT">Student</option>
-              <option value="SUPERVISOR">Supervisor</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Phone (optional)</label>
-            <input
-              value={form.phone}
-              onChange={updateField('phone')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Department (optional)</label>
-            <input
-              value={form.department}
-              onChange={updateField('department')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 rounded-md bg-[#FF6B35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#e35a28] disabled:opacity-60"
-          >
-            {loading ? 'Creating account…' : 'Create account'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-500">
+    <AuthLayout
+      title="Create your account"
+      subtitle="Join ThesisTrack to manage your thesis journey."
+      footer={
+        <>
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-[#FF6B35] hover:underline">
+          <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
             Sign in
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <Alert>{error}</Alert>}
+
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-slate-700">I am a</legend>
+          <div className="grid grid-cols-2 gap-3">
+            {ROLE_OPTIONS.map((option) => {
+              const selected = form.role === option.value
+              return (
+                <label
+                  key={option.value}
+                  className={cx(
+                    'flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors',
+                    selected
+                      ? 'border-brand-500 bg-brand-50/60 ring-1 ring-brand-500'
+                      : 'border-slate-300 hover:border-slate-400',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={option.value}
+                    checked={selected}
+                    onChange={updateField('role')}
+                    className="sr-only"
+                  />
+                  <option.icon className={cx('h-5 w-5', selected ? 'text-brand-600' : 'text-slate-400')} />
+                  <span className="text-sm font-medium text-slate-900">{option.label}</span>
+                  <span className="text-xs text-slate-500">{option.description}</span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        <Field label="Full name" htmlFor="name" error={fieldErrors.name}>
+          <Input id="name" required autoComplete="name" value={form.name} onChange={updateField('name')} invalid={!!fieldErrors.name} />
+        </Field>
+
+        <Field label="Email address" htmlFor="email" error={fieldErrors.email}>
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@auca.ac.rw"
+            value={form.email}
+            onChange={updateField('email')}
+            invalid={!!fieldErrors.email}
+          />
+        </Field>
+
+        <Field label="Password" htmlFor="password" error={fieldErrors.password} hint="At least 8 characters.">
+          <Input
+            id="password"
+            type="password"
+            required
+            autoComplete="new-password"
+            value={form.password}
+            onChange={updateField('password')}
+            invalid={!!fieldErrors.password}
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="Department" htmlFor="department" optional>
+            <Input id="department" value={form.department} onChange={updateField('department')} />
+          </Field>
+          <Field label="Phone" htmlFor="phone" optional>
+            <Input id="phone" type="tel" autoComplete="tel" value={form.phone} onChange={updateField('phone')} />
+          </Field>
+        </div>
+
+        <Button type="submit" size="lg" loading={loading} className="w-full">
+          {loading ? 'Creating account…' : 'Create account'}
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }

@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-
-function dashboardPathForRole(role) {
-  if (role === 'STUDENT') return '/student/dashboard'
-  return '/'
-}
+import AuthLayout from '../layouts/AuthLayout'
+import { Alert, Button, Field, Input } from '../components/ui'
+import { apiError } from '../lib/format'
 
 export default function LoginPage() {
   const { login, loading } = useAuth()
@@ -13,68 +12,75 @@ export default function LoginPage() {
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     try {
-      const data = await login(email, password)
-      const redirectTo = location.state?.from || dashboardPathForRole(data.user.role)
-      navigate(redirectTo, { replace: true })
+      await login(email, password)
+      navigate(location.state?.from || '/', { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password')
+      setError(apiError(err, 'Invalid email or password'))
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-[#1A1A2E]">ThesisTrack</h1>
-        <p className="mb-6 text-sm text-gray-500">Sign in to your account</p>
+    <AuthLayout
+      title="Sign in"
+      subtitle="Welcome back. Sign in with your university account."
+      footer={
+        <>
+          New to ThesisTrack?{' '}
+          <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <Alert>{error}</Alert>}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-              placeholder="you@auca.ac.rw"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Password</label>
-            <input
-              type="password"
+        <Field label="Email address" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@auca.ac.rw"
+          />
+        </Field>
+
+        <Field label="Password" htmlFor="password">
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-              placeholder="••••••••"
+              className="pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
+        </Field>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 rounded-md bg-[#FF6B35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#e35a28] disabled:opacity-60"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Don't have an account?{' '}
-          <Link to="/register" className="font-medium text-[#FF6B35] hover:underline">
-            Register
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Button type="submit" size="lg" loading={loading} className="w-full">
+          {loading ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }
