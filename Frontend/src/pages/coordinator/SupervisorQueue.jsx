@@ -1,8 +1,43 @@
 import { useEffect, useState } from 'react'
+import { Hourglass, PartyPopper, UserCheck, Users } from 'lucide-react'
 import apiClient from '../../api/client'
+import {
+  Alert,
+  Avatar,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Select,
+  StatCard,
+  Table,
+  WaitBadge,
+} from '../../components/ui'
+import { apiError, daysLabel } from '../../lib/format'
 
-function daysLabel(days) {
-  return `${days} ${days === 1 ? 'day' : 'days'}`
+function AssignControl({ thesisId, supervisors, value, onChange, onAssign, busy, stacked }) {
+  return (
+    <div className={stacked ? 'flex flex-col gap-2' : 'flex items-center justify-end gap-2'}>
+      <Select
+        value={value ?? ''}
+        onChange={(e) => onChange(thesisId, e.target.value)}
+        className={stacked ? '' : 'w-60'}
+        aria-label="Supervisor"
+      >
+        <option value="">Choose a supervisor…</option>
+        {supervisors.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} — {s.currentStudentCount} active
+          </option>
+        ))}
+      </Select>
+      <Button onClick={() => onAssign(thesisId)} disabled={!value} loading={busy} icon={UserCheck} size="md">
+        Assign
+      </Button>
+    </div>
+  )
 }
 
 export default function SupervisorQueue() {
@@ -11,138 +46,152 @@ export default function SupervisorQueue() {
   const [selected, setSelected] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [busyThesisId, setBusyThesisId] = useState(null)
 
   async function loadData() {
-    setLoading(true)
-    const [queueRes, supervisorsRes] = await Promise.all([
-      apiClient.get('/theses/queue/supervisor'),
-      apiClient.get('/supervisors'),
-    ])
-    setQueue(queueRes.data)
-    setSupervisors(supervisorsRes.data)
-    setLoading(false)
+    try {
+      const [queueRes, supervisorsRes] = await Promise.all([
+        apiClient.get('/theses/queue/supervisor'),
+        apiClient.get('/supervisors'),
+      ])
+      setQueue(queueRes.data)
+      setSupervisors(supervisorsRes.data)
+    } catch (err) {
+      setError(apiError(err, 'Could not load the assignment queue'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     loadData()
   }, [])
 
+  function handleSelect(thesisId, supervisorId) {
+    setSelected((s) => ({ ...s, [thesisId]: supervisorId }))
+  }
+
   async function handleAssign(thesisId) {
     const supervisorId = selected[thesisId]
     if (!supervisorId) return
 
     setError('')
+    setSuccess('')
     setBusyThesisId(thesisId)
     try {
-      await apiClient.post(`/theses/${thesisId}/assign-supervisor`, { supervisorId })
+      const { data } = await apiClient.post(`/theses/${thesisId}/assign-supervisor`, { supervisorId })
+      setSuccess(`${data.supervisorName} is now supervising ${data.studentName}.`)
       await loadData()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not assign supervisor')
+      setError(apiError(err, 'Could not assign supervisor'))
     } finally {
       setBusyThesisId(null)
     }
   }
 
-  function AssignControl({ thesisId, stacked }) {
-    return (
-      <div className={stacked ? 'flex flex-col gap-2' : 'flex items-center gap-2'}>
-        <select
-          value={selected[thesisId] ?? ''}
-          onChange={(e) => setSelected((s) => ({ ...s, [thesisId]: e.target.value }))}
-          className={[
-            'rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]',
-            stacked ? 'w-full' : '',
-          ].join(' ')}
-        >
-          <option value="">Select supervisor…</option>
-          {supervisors.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} ({s.currentStudentCount} students)
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => handleAssign(thesisId)}
-          disabled={!selected[thesisId] || busyThesisId === thesisId}
-          className={[
-            'rounded-md bg-[#FF6B35] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#e35a28] disabled:opacity-50',
-            stacked ? 'w-full' : '',
-          ].join(' ')}
-        >
-          {busyThesisId === thesisId ? 'Assigning…' : 'Assign'}
-        </button>
-      </div>
-    )
-  }
+  if (loading) return <LoadingState label="Loading assignment queue…" />
+
+  const longestWait = queue.reduce((max, t) => Math.max(max, t.daysInCurrentStage), 0)
+  const averageLoad = supervisors.length
+    ? (supervisors.reduce((sum, s) => sum + s.currentStudentCount, 0) / supervisors.length).toFixed(1)
+    : '—'
+
+  const controlProps = (thesisId) => ({
+    thesisId,
+    supervisors,
+    value: selected[thesisId],
+    onChange: handleSelect,
+    onAssign: handleAssign,
+    busy: busyThesisId === thesisId,
+  })
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-[#1A1A2E]">Supervisor Assignment Queue</h1>
-      <p className="text-sm text-gray-500">Students waiting for a supervisor, sorted oldest-waiting first.</p>
+    <>
+      <PageHeader
+        title="Supervisor assignment"
+        description="Students whose prototype has been reviewed and who are waiting for a supervisor, longest-waiting first."
+      />
 
-      {error && <p className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Waiting for a supervisor" value={queue.length} icon={Users} />
+        <StatCard
+          label="Longest wait"
+          value={queue.length ? daysLabel(longestWait) : '—'}
+          icon={Hourglass}
+          tone={longestWait >= 30 ? 'red' : 'amber'}
+        />
+        <StatCard label="Avg. students per supervisor" value={averageLoad} hint={`${supervisors.length} supervisors`} icon={UserCheck} tone="violet" />
+      </div>
 
-      {loading ? (
-        <p className="rounded-2xl bg-white p-6 text-sm text-gray-500 shadow-sm">Loading…</p>
-      ) : queue.length === 0 ? (
-        <p className="rounded-2xl bg-white p-6 text-sm text-gray-500 shadow-sm">
-          No one is waiting for a supervisor right now.
-        </p>
-      ) : (
-        <>
-          {/* Card layout below md — the table's columns don't fit a phone screen, and the
-              assign controls are the whole point of this page so they can't be the part
-              that scrolls off-screen. */}
-          <div className="flex flex-col gap-4 md:hidden">
-            {queue.map((thesis) => (
-              <div key={thesis.id} className="rounded-2xl bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-[#1A1A2E]">{thesis.studentName}</p>
-                    <p className="text-xs text-gray-500">{thesis.studentEmail}</p>
-                  </div>
-                  <span className="shrink-0 text-sm font-medium text-[#FF6B35]">
-                    {daysLabel(thesis.daysInCurrentStage)}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-gray-700">{thesis.title}</p>
-                <div className="mt-3">
-                  <AssignControl thesisId={thesis.id} stacked />
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-4">
+        {error && <Alert>{error}</Alert>}
+        {success && <Alert tone="success">{success}</Alert>}
 
-          <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm md:block">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="px-6 py-3">Student</th>
-                  <th className="px-6 py-3">Thesis</th>
-                  <th className="px-6 py-3">Waiting</th>
-                  <th className="px-6 py-3">Assign supervisor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+        <Card>
+          <CardHeader title="Queue" />
+          {queue.length === 0 ? (
+            <EmptyState icon={PartyPopper} title="Queue is clear" description="Every reviewed student has a supervisor." />
+          ) : (
+            <>
+              {/* Cards below md: the assign control is the point of this page, so it must not scroll off-screen. */}
+              <ul className="divide-y divide-slate-100 md:hidden">
                 {queue.map((thesis) => (
-                  <tr key={thesis.id}>
-                    <td className="px-6 py-3">
-                      <p className="font-medium text-[#1A1A2E]">{thesis.studentName}</p>
-                      <p className="text-xs text-gray-500">{thesis.studentEmail}</p>
-                    </td>
-                    <td className="px-6 py-3 text-gray-700">{thesis.title}</td>
-                    <td className="px-6 py-3 font-medium text-[#FF6B35]">{daysLabel(thesis.daysInCurrentStage)}</td>
-                    <td className="px-6 py-3">
-                      <AssignControl thesisId={thesis.id} />
-                    </td>
-                  </tr>
+                  <li key={thesis.id} className="space-y-3 px-5 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar name={thesis.studentName} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-900">{thesis.studentName}</p>
+                          <p className="truncate text-xs text-slate-500">{thesis.studentEmail}</p>
+                        </div>
+                      </div>
+                      <WaitBadge days={thesis.daysInCurrentStage} />
+                    </div>
+                    <p className="text-sm text-slate-700">{thesis.title}</p>
+                    <AssignControl {...controlProps(thesis.id)} stacked />
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </div>
+              </ul>
+
+              <div className="hidden md:block">
+                <Table
+                  minWidth={760}
+                  columns={[
+                    { label: 'Student' },
+                    { label: 'Thesis' },
+                    { label: 'Waiting' },
+                    { label: 'Assign supervisor', align: 'right' },
+                  ]}
+                >
+                  {queue.map((thesis) => (
+                    <tr key={thesis.id} className="hover:bg-slate-50/60">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={thesis.studentName} size="sm" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900">{thesis.studentName}</p>
+                            <p className="text-xs text-slate-500">{thesis.studentEmail}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="max-w-xs px-5 py-3 text-slate-700">
+                        <p className="line-clamp-2">{thesis.title}</p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <WaitBadge days={thesis.daysInCurrentStage} />
+                      </td>
+                      <td className="px-5 py-3">
+                        <AssignControl {...controlProps(thesis.id)} />
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+    </>
   )
 }

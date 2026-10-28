@@ -1,35 +1,61 @@
 import { useEffect, useState } from 'react'
+import { CalendarClock, CalendarPlus, MapPin, Trash2 } from 'lucide-react'
 import apiClient from '../../api/client'
-
-function formatDate(dateStr) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function formatTime(timeStr) {
-  return timeStr.slice(0, 5)
-}
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  LoadingState,
+  PageHeader,
+  StatCard,
+  Table,
+} from '../../components/ui'
+import { cx } from '../../lib/cx'
+import { apiError, dateParts, formatTime } from '../../lib/format'
 
 const emptyForm = { slotDate: '', startTime: '', endTime: '', capacity: 1, location: '', notes: '' }
+
+function CapacityBar({ booked, capacity }) {
+  const percent = capacity > 0 ? Math.min((booked / capacity) * 100, 100) : 0
+  const full = booked >= capacity
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+        <div className={cx('h-full rounded-full', full ? 'bg-amber-500' : 'bg-brand-600')} style={{ width: `${percent}%` }} />
+      </div>
+      <span className="text-sm whitespace-nowrap text-slate-600 tabular-nums">
+        {booked}/{capacity}
+      </span>
+    </div>
+  )
+}
 
 export default function SlotsManagement() {
   const [slots, setSlots] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [listError, setListError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  const [created, setCreated] = useState(false)
   const [busySlotId, setBusySlotId] = useState(null)
 
   async function loadSlots() {
-    setLoading(true)
-    const { data } = await apiClient.get('/slots')
-    setSlots(data)
-    setLoading(false)
+    try {
+      const { data } = await apiClient.get('/slots')
+      setSlots(data)
+    } catch (err) {
+      setListError(apiError(err, 'Could not load slots'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -37,13 +63,17 @@ export default function SlotsManagement() {
   }, [])
 
   function updateField(field) {
-    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
+    return (e) => {
+      setCreated(false)
+      setForm((f) => ({ ...f, [field]: e.target.value }))
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
+    setFormError('')
     setFieldErrors({})
+    setCreated(false)
     setSubmitting(true)
     try {
       await apiClient.post('/slots', {
@@ -53,9 +83,10 @@ export default function SlotsManagement() {
         endTime: `${form.endTime}:00`,
       })
       setForm(emptyForm)
+      setCreated(true)
       await loadSlots()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not create slot')
+      setFormError(apiError(err, 'Could not create slot'))
       setFieldErrors(err.response?.data?.fieldErrors || {})
     } finally {
       setSubmitting(false)
@@ -63,127 +94,142 @@ export default function SlotsManagement() {
   }
 
   async function handleCancel(slotId) {
-    setError('')
+    setListError('')
     setBusySlotId(slotId)
     try {
       await apiClient.delete(`/slots/${slotId}`)
       await loadSlots()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not cancel this slot')
+      setListError(apiError(err, 'Could not cancel this slot'))
     } finally {
       setBusySlotId(null)
     }
   }
 
+  const totalCapacity = slots.reduce((sum, s) => sum + s.capacity, 0)
+  const totalBooked = slots.reduce((sum, s) => sum + s.bookedCount, 0)
+
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-[#1A1A2E]">Manage Review Slots</h1>
+    <>
+      <PageHeader
+        title="Review slots"
+        description="Publish prototype review sessions for students to book."
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-[#1A1A2E]">Create a new slot</h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Date</label>
-            <input
-              type="date"
-              required
-              value={form.slotDate}
-              onChange={updateField('slotDate')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-            {fieldErrors.slotDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.slotDate}</p>}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Start time</label>
-            <input
-              type="time"
-              required
-              value={form.startTime}
-              onChange={updateField('startTime')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">End time</label>
-            <input
-              type="time"
-              required
-              value={form.endTime}
-              onChange={updateField('endTime')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Capacity</label>
-            <input
-              type="number"
-              min={1}
-              required
-              value={form.capacity}
-              onChange={updateField('capacity')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Location (optional)</label>
-            <input
-              value={form.location}
-              onChange={updateField('location')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-[#1A1A2E]">Notes (optional)</label>
-            <input
-              value={form.notes}
-              onChange={updateField('notes')}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#FF6B35] focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-3">{error}</p>}
-
-          <div className="sm:col-span-2 lg:col-span-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-md bg-[#FF6B35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#e35a28] disabled:opacity-60"
-            >
-              {submitting ? 'Creating…' : 'Create slot'}
-            </button>
-          </div>
-        </form>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Upcoming slots" value={loading ? '—' : slots.length} icon={CalendarClock} />
+        <StatCard label="Seats booked" value={loading ? '—' : `${totalBooked} / ${totalCapacity}`} icon={CalendarPlus} tone="violet" />
+        <StatCard
+          label="Seats open"
+          value={loading ? '—' : totalCapacity - totalBooked}
+          hint="Across all upcoming slots"
+          icon={CalendarClock}
+          tone="green"
+        />
       </div>
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-[#1A1A2E]">Upcoming slots</h2>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-1 xl:self-start">
+          <CardHeader title="New slot" description="Students are notified when they book." />
+          <CardBody>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && <Alert>{formError}</Alert>}
+              {created && <Alert tone="success">Slot published.</Alert>}
 
-        {loading && <p className="text-sm text-gray-500">Loading…</p>}
-        {!loading && slots.length === 0 && <p className="text-sm text-gray-500">No upcoming slots yet.</p>}
-
-        <ul className="flex flex-col divide-y divide-gray-100">
-          {slots.map((slot) => (
-            <li key={slot.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#1A1A2E]">
-                  {formatDate(slot.slotDate)} · {formatTime(slot.startTime)}–{formatTime(slot.endTime)}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {slot.location ? `${slot.location} · ` : ''}
-                  {slot.bookedCount}/{slot.capacity} booked
-                </p>
+              <Field label="Date" htmlFor="slotDate" error={fieldErrors.slotDate}>
+                <Input id="slotDate" type="date" required value={form.slotDate} onChange={updateField('slotDate')} invalid={!!fieldErrors.slotDate} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Start" htmlFor="startTime" error={fieldErrors.startTime}>
+                  <Input id="startTime" type="time" required value={form.startTime} onChange={updateField('startTime')} />
+                </Field>
+                <Field label="End" htmlFor="endTime" error={fieldErrors.endTime}>
+                  <Input id="endTime" type="time" required value={form.endTime} onChange={updateField('endTime')} />
+                </Field>
               </div>
-              <button
-                onClick={() => handleCancel(slot.id)}
-                disabled={busySlotId === slot.id}
-                className="self-start rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 sm:self-auto"
-              >
-                {busySlotId === slot.id ? 'Cancelling…' : 'Cancel slot'}
-              </button>
-            </li>
-          ))}
-        </ul>
+              <Field label="Capacity" htmlFor="capacity" error={fieldErrors.capacity} hint="Number of students per session.">
+                <Input id="capacity" type="number" min={1} required value={form.capacity} onChange={updateField('capacity')} />
+              </Field>
+              <Field label="Location" htmlFor="location" optional>
+                <Input id="location" placeholder="e.g. Room B12" value={form.location} onChange={updateField('location')} />
+              </Field>
+              <Field label="Notes" htmlFor="notes" optional>
+                <Input id="notes" placeholder="e.g. Bring your laptop" value={form.notes} onChange={updateField('notes')} />
+              </Field>
+
+              <Button type="submit" loading={submitting} icon={CalendarPlus} className="w-full">
+                Publish slot
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader title="Upcoming slots" />
+          {listError && <Alert className="mx-5 mt-4">{listError}</Alert>}
+          {loading ? (
+            <LoadingState />
+          ) : slots.length === 0 ? (
+            <EmptyState icon={CalendarClock} title="No upcoming slots" description="Publish a slot to let students book their prototype review." />
+          ) : (
+            <Table
+              minWidth={560}
+              columns={[
+                { label: 'Date' },
+                { label: 'Time' },
+                { label: 'Location' },
+                { label: 'Booked' },
+                { label: <span className="sr-only">Actions</span>, key: 'actions', align: 'right' },
+              ]}
+            >
+              {slots.map((slot) => {
+                const { month, day, weekday } = dateParts(slot.slotDate)
+                return (
+                  <tr key={slot.id} className="hover:bg-slate-50/60">
+                    <td className="px-5 py-3">
+                      <p className="font-medium whitespace-nowrap text-slate-900">
+                        {month} {day}
+                      </p>
+                      <p className="text-xs text-slate-500">{weekday}</p>
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap text-slate-700 tabular-nums">
+                      {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
+                    </td>
+                    <td className="px-5 py-3 text-slate-700">
+                      {slot.location ? (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                          {slot.location}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <CapacityBar booked={slot.bookedCount} capacity={slot.capacity} />
+                        {slot.bookedCount >= slot.capacity && <Badge tone="amber">Full</Badge>}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Trash2}
+                        onClick={() => handleCancel(slot.id)}
+                        loading={busySlotId === slot.id}
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        Cancel
+                      </Button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </Table>
+          )}
+        </Card>
       </div>
-    </div>
+    </>
   )
 }
