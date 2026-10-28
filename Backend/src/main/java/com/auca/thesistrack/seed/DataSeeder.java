@@ -63,6 +63,7 @@ public class DataSeeder implements CommandLineRunner {
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final StageHistoryBackfill stageHistoryBackfill;
 
     @Value("${app.seed.enabled:false}")
     private boolean seedEnabled;
@@ -80,7 +81,8 @@ public class DataSeeder implements CommandLineRunner {
                        NotificationRepository notificationRepository,
                        NotificationService notificationService,
                        PasswordEncoder passwordEncoder,
-                       JdbcTemplate jdbcTemplate) {
+                       JdbcTemplate jdbcTemplate,
+                       StageHistoryBackfill stageHistoryBackfill) {
         this.userRepository = userRepository;
         this.thesisRepository = thesisRepository;
         this.reviewSlotRepository = reviewSlotRepository;
@@ -90,6 +92,7 @@ public class DataSeeder implements CommandLineRunner {
         this.notificationService = notificationService;
         this.passwordEncoder = passwordEncoder;
         this.jdbcTemplate = jdbcTemplate;
+        this.stageHistoryBackfill = stageHistoryBackfill;
     }
 
     @Override
@@ -102,7 +105,7 @@ public class DataSeeder implements CommandLineRunner {
         if (seedReset) {
             log.info("app.seed.reset=true — truncating all application tables before seeding");
             jdbcTemplate.execute(
-                    "TRUNCATE TABLE notifications, feedback, thesis_documents, messages, bookings, " +
+                    "TRUNCATE TABLE thesis_stage_history, notifications, feedback, thesis_documents, messages, bookings, " +
                             "review_slots, theses, users RESTART IDENTITY CASCADE");
         } else if (userRepository.count() > 0) {
             log.info("Seed data skipped: users table is not empty (set app.seed.reset=true to force a clean reseed)");
@@ -141,6 +144,10 @@ public class DataSeeder implements CommandLineRunner {
         supervisedTheses.addAll(readyForDefense);
         supervisedTheses.addAll(completed);
         seedMessages(supervisedTheses);
+
+        // Theses above were saved straight through the repository with backdated JDBC
+        // timestamps, bypassing ThesisService, so derive their stage history from those.
+        stageHistoryBackfill.backfill();
 
         log.info("Seed data complete: {} users, {} theses, {} slots, {} bookings, {} messages, {} notifications",
                 userRepository.count(), thesisRepository.count(), reviewSlotRepository.count(),
