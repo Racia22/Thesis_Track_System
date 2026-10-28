@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #1A1A2E;
+  --color-navy-light: #24243c;
+  --color-orange: #FF6B35;
+  --color-orange-dark: #e35a28;
+  --color-cream: #FFF8F0;
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-cream);
+  font-family: var(--font-sans);
+  color: #1A1A2E;
+}
